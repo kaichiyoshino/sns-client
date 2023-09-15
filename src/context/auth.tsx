@@ -1,0 +1,72 @@
+import apiClient from "@/lib/apiClient";
+import React, { ReactNode, useContext, useEffect, useState } from "react";
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+interface AuthContextType {
+  user: null | { id: number; email: string; username: string };
+  login: (token: string) => void;
+  logout: () => void;
+}
+
+const AuthContext = React.createContext<AuthContextType>({
+  user: null,
+  login: () => {},
+  logout: () => {},
+});
+
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<null | {
+    id: number;
+    email: string;
+    username: string;
+  }>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      apiClient.defaults.headers["authorization"] = `Bearer ${token}`;
+
+      apiClient
+        .get("/users/find")
+        .then((res) => {
+          setUser(res.data.user);
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    }
+  }, []);
+  const login = async (token: string) => {
+    localStorage.setItem("auth_token", token);
+    apiClient.defaults.headers["authorization"] = `Bearer ${token}`;
+
+    try {
+      apiClient.get("/users/find").then((res) => {
+        setUser(res.data.user);
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("auth_token");
+    delete apiClient.defaults.headers["authorization"];
+    setUser(null);
+  };
+
+  const value = {
+    user,
+    login,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
